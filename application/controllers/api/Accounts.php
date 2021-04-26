@@ -3,8 +3,6 @@ declare(strict_types = 1);
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-use \Firebase\JWT\JWT;
-
 class Accounts extends CI_Controller {
 
   public function __construct() {
@@ -15,6 +13,9 @@ class Accounts extends CI_Controller {
     $this->form_validation->set_error_delimiters(null, null);
   }
 
+  /**
+   * GET /index.php/api/accounts/signup
+   */
   public function signup_get() {
     return json_response(200, [
       'statusCode' => 200,
@@ -27,6 +28,9 @@ class Accounts extends CI_Controller {
     ]);
   }
 
+  /**
+   * POST /index.php/api/accounts/signup
+   */
   public function signup_post() {
     $request_body = $this->input->post($this->User_model::SIGNUP_FIELDS);
 
@@ -54,29 +58,74 @@ class Accounts extends CI_Controller {
       ->where(['username' => $user['username']])
       ->get()
       ->row();
-    
-    $jwt_secret_key = $_ENV['JWT_SECRET_KEY'];
-
-    $payload = [
-      'id' => $signed_up_user->id,
-      'username' => $signed_up_user->username,
-      'email' => $signed_up_user->email,
-      'iat' => time(),
-      'exp' => time() + (60 * 60 * 24 * 2)
-    ];
-
-    $token = JWT::encode($payload, $jwt_secret_key);
 
     json_response(200, [
       'message' => 'User signed up successfully!',
       'user' => $signed_up_user,
-      'token' => $token
+      'token' => $this->User_model::generate_auth_token($signed_up_user)
     ]);
   }
 
+  /**
+   * GET /index.php/api/accounts/login
+   */
   public function login_get() {
-    // TODO: Add login logic
+    return json_response(200, [
+      'statusCode' => 200,
+      'message' => 'User login API',
+      'request' => [
+        'method' => 'POST',
+        'path' => '/api/accounts/login',
+        'body_fields' => $this->User_model::LOGIN_FIELDS
+      ]
+    ]);
+  }
 
-    json_response(200, ['message' => 'Welcome to Login page']);
+  /**
+   * POST /index.php/api/accounts/login
+   */
+  public function login_post() {
+    $request_body = $this->input->post($this->User_model::LOGIN_FIELDS);
+
+    $this->form_validation->set_data($request_body);
+
+    if ($this->form_validation->run() == false) {
+      return json_response(400, [
+        'statusCode' => 400,
+        'errors' => $this->form_validation->error_array()
+      ]);
+    }
+
+    // find user by username
+    $found_user = $this->db
+      ->select(['id', 'first_name', 'last_name', 'username', 'password', 'email'])
+      ->from('users')
+      ->where(['username' => $request_body['username']])
+      ->get()
+      ->row();
+
+    if (!$found_user) {
+      return json_response(401, [
+        'statusCode' => 401,
+        'message' => 'Invalid username or password'
+      ]);
+    }
+
+    // verify password
+    if (!password_verify($request_body['password'], $found_user->password)) {
+      return json_response(401, [
+        'statusCode' => 401,
+        'message' => 'Invalid username or password'
+      ]);
+    }
+
+    unset($found_user->password);
+
+    json_response(200, [
+      'statusCode' => 200,
+      'message' => 'User logged in successfully!',
+      'user' => $found_user,
+      'token' => $this->User_model::generate_auth_token($found_user)
+    ]);
   }
 }

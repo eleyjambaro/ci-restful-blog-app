@@ -53,6 +53,7 @@ $route['api/accounts/signup']['GET'] = 'api/accounts/signup_get';
 $route['api/accounts/signup']['POST'] = 'api/accounts/signup_post';
 
 $route['api/accounts/login']['GET'] = 'api/accounts/login_get';
+$route['api/accounts/login']['POST'] = 'api/accounts/login_post';
 
 $route['default_controller'] = 'welcome';
 $route['404_override'] = '';

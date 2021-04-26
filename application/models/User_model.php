@@ -3,7 +3,17 @@ declare(strict_types = 1);
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+use \Firebase\JWT\JWT;
+
 class User_model extends CI_Model {
+  /**
+   * List of all fields needed when logging in
+   */
+  public const LOGIN_FIELDS = [
+    'username',
+    'password'
+  ];
+
   /**
    * List of all fields needed when signing up
    */
@@ -50,5 +60,27 @@ class User_model extends CI_Model {
     $filtered_user_data['password'] = password_hash($filtered_user_data['password'], PASSWORD_DEFAULT);
 
     return $filtered_user_data;
+  }
+
+  /**
+   * Returns a generated token with user data payload
+   */
+  public static function generate_auth_token(
+    array | object $user_data,
+    array $payload_fields = ['id', 'username', 'email']
+  ): string {
+
+    $user_data_payload = [];
+
+    foreach ($payload_fields as $field) {
+      $user_data_payload[$field] = $user_data->{$field};
+    }
+
+    $claims = [
+      'iat' => time(),
+      'exp' => time() + (60 * 60 * 24 * 2)
+    ];
+
+    return JWT::encode(array_merge($user_data_payload, $claims), $_ENV['JWT_SECRET_KEY']);
   }
 }
