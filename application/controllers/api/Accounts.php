@@ -3,6 +3,8 @@ declare(strict_types = 1);
 
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+use \Firebase\JWT\JWT;
+
 class Accounts extends CI_Controller {
 
   public function __construct() {
@@ -19,7 +21,7 @@ class Accounts extends CI_Controller {
       'message' => 'User signup API',
       'request' => [
         'method' => 'POST',
-        'path' => '/accounts/signup',
+        'path' => '/api/accounts/signup',
         'body_fields' => $this->User_model::SIGNUP_FIELDS
       ]
     ]);
@@ -52,12 +54,23 @@ class Accounts extends CI_Controller {
       ->where(['username' => $user['username']])
       ->get()
       ->row();
+    
+    $jwt_secret_key = $_ENV['JWT_SECRET_KEY'];
 
-    // TODO: Generate authentication token and add to the response data
+    $payload = [
+      'id' => $signed_up_user->id,
+      'username' => $signed_up_user->username,
+      'email' => $signed_up_user->email,
+      'iat' => time(),
+      'exp' => time() + (60 * 60 * 24 * 2)
+    ];
+
+    $token = JWT::encode($payload, $jwt_secret_key);
 
     json_response(200, [
       'message' => 'User signed up successfully!',
-      'user' => $signed_up_user
+      'user' => $signed_up_user,
+      'token' => $token
     ]);
   }
 
