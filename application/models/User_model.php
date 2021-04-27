@@ -6,10 +6,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 use \Firebase\JWT\JWT;
 
 class User_model extends CI_Model {
+  public const COMPLETE_NAME = [
+    'first_name',
+    'last_name'
+  ];
+
   /**
    * List of all fields needed when logging in
    */
-  public const LOGIN_FIELDS = [
+  public const LOCAL_LOGIN_FIELDS = [
     'username',
     'password'
   ];
@@ -17,9 +22,8 @@ class User_model extends CI_Model {
   /**
    * List of all fields needed when signing up
    */
-  public const SIGNUP_FIELDS = [
-    'first_name',
-    'last_name',
+  public const LOCAL_SIGNUP_FIELDS = [
+    ...self::COMPLETE_NAME,
     'username',
     'password',
     'confirm_password',
@@ -29,11 +33,24 @@ class User_model extends CI_Model {
   /**
    * List of all fields required in the database
    */
-  public const REQUIRED_USER_DATA = [
-    'first_name',
-    'last_name',
+  public const LOCAL_SIGNUP_REQUIRED_DATA = [
+    ...self::COMPLETE_NAME,
     'username',
     'password',
+    'email'
+  ];
+
+  public const RESPONSE_USER_FIELDS = [
+    'id',
+    ...self::COMPLETE_NAME,
+    'username',
+    'email'
+  ];
+
+  public const RESPONSE_TOKEN_PAYLOAD = [
+    'id',
+    ...self::COMPLETE_NAME,
+    'username',
     'email'
   ];
 
@@ -43,23 +60,58 @@ class User_model extends CI_Model {
   }
 
   /**
-   * Excludes field/s of user data that is/are not needed in the database.
-   * The filter will be based on this REQUIRED_USER_DATA constant property
+   * Excludes field/s of data that is/are not needed.
+   * The filter will be based on the required_fields param.
    */
-  private static function filter_user_data(array $user_data): array {
-    return array_filter($user_data, function($key) {
-      return in_array($key, self::REQUIRED_USER_DATA);
+  private function filter_user_data(array $user_data, array $required_fields): array {
+    return array_filter($user_data, function($key) use($required_fields) {
+      return in_array($key, $required_fields);
     }, ARRAY_FILTER_USE_KEY);
   }
 
   /**
-   * Returns a filtered user data with a hashed password
+   * Local user signup
    */
-  public static function create(array $user_data): array {
-    $filtered_user_data = static::filter_user_data($user_data);
+  public function signup_local(array $request_body): object | bool {
+    $filtered_user_data = $this->filter_user_data($request_body, self::LOCAL_SIGNUP_REQUIRED_DATA);
     $filtered_user_data['password'] = password_hash($filtered_user_data['password'], PASSWORD_DEFAULT);
 
-    return $filtered_user_data;
+    if (!$this->db->insert('users', $filtered_user_data)) {
+      return false;
+    }
+
+    return $this->db
+      ->select(self::RESPONSE_USER_FIELDS)
+      ->from('users')
+      ->where(['username' => $filtered_user_data['username']])
+      ->get()
+      ->row();
+  }
+
+  /**
+   * Local user login
+   */
+  public function login_local(array $request_body): object | bool {
+    // find user by username
+    $found_user = $this->db
+      ->select([...self::RESPONSE_USER_FIELDS, 'password'])
+      ->from('users')
+      ->where(['username' => $request_body['username']])
+      ->get()
+      ->row();
+
+    if (!$found_user) {
+      return false;
+    }
+
+    // verify password
+    if (!password_verify($request_body['password'], $found_user->password)) {
+      return false;
+    }
+
+    unset($found_user->password);
+
+    return $found_user;
   }
 
   /**
@@ -67,7 +119,7 @@ class User_model extends CI_Model {
    */
   public static function generate_auth_token(
     array | object $user_data,
-    array $payload_fields = ['id', 'username', 'email']
+    array $payload_fields = self::RESPONSE_TOKEN_PAYLOAD
   ): string {
 
     $user_data_payload = [];

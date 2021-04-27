@@ -23,7 +23,7 @@ class Accounts extends CI_Controller {
       'request' => [
         'method' => 'POST',
         'path' => '/api/accounts/signup',
-        'body_fields' => $this->User_model::SIGNUP_FIELDS
+        'body_fields' => $this->User_model::LOCAL_SIGNUP_FIELDS
       ]
     ]);
   }
@@ -32,7 +32,7 @@ class Accounts extends CI_Controller {
    * POST /index.php/api/accounts/signup
    */
   public function signup_post() {
-    $request_body = $this->input->post($this->User_model::SIGNUP_FIELDS);
+    $request_body = $this->input->post($this->User_model::LOCAL_SIGNUP_FIELDS);
 
     $this->form_validation->set_data($request_body);
 
@@ -43,21 +43,14 @@ class Accounts extends CI_Controller {
       ]);
     }
 
-    $user = $this->User_model::create($request_body);
+    $signed_up_user = (new $this->User_model())->signup_local($request_body);
 
-    if (!$this->db->insert('users', $user)) {
+    if (!$signed_up_user) {
       return json_response(500, [
         'statusCode' => 500,
         'message' => 'Something went wrong'
       ]);
     }
-
-    $signed_up_user = $this->db
-      ->select(['id', 'first_name', 'last_name', 'username', 'email'])
-      ->from('users')
-      ->where(['username' => $user['username']])
-      ->get()
-      ->row();
 
     json_response(200, [
       'message' => 'User signed up successfully!',
@@ -76,7 +69,7 @@ class Accounts extends CI_Controller {
       'request' => [
         'method' => 'POST',
         'path' => '/api/accounts/login',
-        'body_fields' => $this->User_model::LOGIN_FIELDS
+        'body_fields' => $this->User_model::LOCAL_LOGIN_FIELDS
       ]
     ]);
   }
@@ -85,7 +78,7 @@ class Accounts extends CI_Controller {
    * POST /index.php/api/accounts/login
    */
   public function login_post() {
-    $request_body = $this->input->post($this->User_model::LOGIN_FIELDS);
+    $request_body = $this->input->post($this->User_model::LOCAL_LOGIN_FIELDS);
 
     $this->form_validation->set_data($request_body);
 
@@ -96,36 +89,20 @@ class Accounts extends CI_Controller {
       ]);
     }
 
-    // find user by username
-    $found_user = $this->db
-      ->select(['id', 'first_name', 'last_name', 'username', 'password', 'email'])
-      ->from('users')
-      ->where(['username' => $request_body['username']])
-      ->get()
-      ->row();
+    $logged_in_user = (new $this->User_model())->login_local($request_body);
 
-    if (!$found_user) {
+    if (!$logged_in_user) {
       return json_response(401, [
         'statusCode' => 401,
         'message' => 'Invalid username or password'
       ]);
     }
-
-    // verify password
-    if (!password_verify($request_body['password'], $found_user->password)) {
-      return json_response(401, [
-        'statusCode' => 401,
-        'message' => 'Invalid username or password'
-      ]);
-    }
-
-    unset($found_user->password);
 
     json_response(200, [
       'statusCode' => 200,
       'message' => 'User logged in successfully!',
-      'user' => $found_user,
-      'token' => $this->User_model::generate_auth_token($found_user)
+      'user' => $logged_in_user,
+      'token' => $this->User_model::generate_auth_token($logged_in_user)
     ]);
   }
 
@@ -138,7 +115,7 @@ class Accounts extends CI_Controller {
     try {
       $token_payload = $this->User_model::decode_auth_token($request_token);
     } catch (Exception $e) {
-      json_response(401, [
+      return json_response(401, [
         'statusCode' => 401,
         'message' => 'Invalid token',
         'error' => $e->getMessage()
@@ -146,11 +123,18 @@ class Accounts extends CI_Controller {
     }
 
     $authenticated_user = $this->db
-      ->select(['id', 'first_name', 'last_name', 'username', 'email'])
+      ->select($this->User_model::RESPONSE_USER_FIELDS)
       ->from('users')
       ->where(['id' => $token_payload->id])
       ->get()
       ->row();
+
+    if (!$authenticated_user) {
+      return json_response(404, [
+        'statusCode' => 404,
+        'message' => 'User not found',
+      ]);
+    }
 
     json_response(200, [
       'statusCode' => 200,
