@@ -128,4 +128,34 @@ class Accounts extends CI_Controller {
       'token' => $this->User_model::generate_auth_token($found_user)
     ]);
   }
+
+  /**
+   * GET /index.php/api/accounts/validate_user
+   */
+  public function validate_user_get() {
+    $request_token = $this->input->get_request_header('authorization');
+    
+    try {
+      $token_payload = $this->User_model::decode_auth_token($request_token);
+    } catch (Exception $e) {
+      json_response(401, [
+        'statusCode' => 401,
+        'message' => 'Invalid token',
+        'error' => $e->getMessage()
+      ]);
+    }
+
+    $authenticated_user = $this->db
+      ->select(['id', 'first_name', 'last_name', 'username', 'email'])
+      ->from('users')
+      ->where(['id' => $token_payload->id])
+      ->get()
+      ->row();
+
+    json_response(200, [
+      'statusCode' => 200,
+      'message' => 'Authenticated user',
+      'user' => $authenticated_user
+    ]);
+  }
 }

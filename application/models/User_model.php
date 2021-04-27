@@ -83,4 +83,15 @@ class User_model extends CI_Model {
 
     return JWT::encode(array_merge($user_data_payload, $claims), $_ENV['JWT_SECRET_KEY']);
   }
+
+  /**
+   * Returns a decoded token if the token is valid
+   */
+  public static function decode_auth_token(string $token): ?object {
+    try {
+      return JWT::decode($token, $_ENV['JWT_SECRET_KEY'], ['HS256']);
+    } catch (Exception $e) {
+      throw $e;
+    }
+  }
 }
