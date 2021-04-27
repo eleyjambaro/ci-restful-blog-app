@@ -313,3 +313,12 @@ switch (ENVIRONMENT)
  * And away we go...
  */
 require_once BASEPATH.'core/CodeIgniter.php';
+
+/**
+ * Aside from enabling the $config['composer_autoload'] in the config file
+ * to tell CodeIgniter to look for a composer package auto-loader script,
+ * it's still needed to explicitly require the composer vendor/autoload.php
+ * file here to let the code editor intellisense detect the definition of
+ * all classes we're using in a particular file.
+ */
+require_once FCPATH.'vendor/autoload.php';

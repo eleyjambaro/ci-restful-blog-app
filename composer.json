@@ -4,7 +4,8 @@
 	"type": "project",
 	"require": {
 		"php": ">=5.3.7",
-		"vlucas/phpdotenv": "^5.3"
+		"vlucas/phpdotenv": "^5.3",
+		"firebase/php-jwt": "^5.2"
 	},
 	"suggest": {
 		"paragonie/random_compat": "Provides better randomness in PHP 5.x"
